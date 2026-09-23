@@ -1,0 +1,5 @@
+# Dependencias Python do Stream Downloader.
+# O main.py tambem instala automaticamente se faltarem.
+PySide6>=6.5
+yt-dlp
+certifi
