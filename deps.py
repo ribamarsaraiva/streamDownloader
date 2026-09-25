@@ -275,8 +275,10 @@ def _extract_ffmpeg_from_zip(zip_path: Path, log: LogFn) -> bool:
 def ensure_ffmpeg(log: LogFn = _default_log) -> Optional[str]:
     """
     Garante que o FFmpeg esteja disponivel.
-    Se ja existir (local ou PATH), retorna o caminho.
-    No Windows, baixa e instala localmente se faltar.
+    Se ja existir (local, PATH ou embutido no .exe), retorna o caminho.
+    No Windows (modo .py), baixa e instala localmente se faltar.
+    Em modo empacotado (.exe), NAO baixa nada: o FFmpeg deve ter sido
+    embutido no build (veja build_exe.bat / StreamDownloader.spec).
     Em outros SOs, orienta o usuario (nao auto-instala).
     Retorna o caminho do ffmpeg ou None.
     """
@@ -285,6 +287,14 @@ def ensure_ffmpeg(log: LogFn = _default_log) -> Optional[str]:
         log(f"OK: FFmpeg encontrado em {existing}")
         return existing
 
+    # Modo empacotado: nao baixa. O exe deve ser gerado com FFmpeg embutido.
+    if getattr(sys, "frozen", False):
+        log(
+            "AVISO: FFmpeg nao encontrado no executavel. "
+            "Reconstrua o .exe com o FFmpeg embutido (rode build_exe.bat)."
+        )
+        return None
+
     if not is_windows():
         log(
             "FFmpeg nao encontrado. Neste SO instale manualmente "
@@ -292,7 +302,7 @@ def ensure_ffmpeg(log: LogFn = _default_log) -> Optional[str]:
         )
         return None
 
-    # Windows: baixa build oficial e extrai para ./bin
+    # Windows (modo script): baixa build oficial e extrai para ./bin
     log("FFmpeg nao encontrado. Baixando build para Windows ...")
     zip_path = APP_DIR / "ffmpeg_download.zip"
     if not _download_file(FFMPEG_WINDOWS_URL, zip_path, log):
@@ -322,11 +332,10 @@ def ensure_all(log: LogFn = _default_log) -> dict:
     """
     log("== Verificando dependencias ==")
 
-    # Quando empacotado como .exe (PyInstaller), as dependencias Python ja estao
-    # embutidas: nao existe pip nem interpretador para instalar nada. So
-    # garantimos o FFmpeg (que continua sendo um binario externo).
+    # Quando empacotado como .exe (PyInstaller), as dependencias Python e o
+    # FFmpeg ja devem estar embutidos: nao existe pip nem download.
     if getattr(sys, "frozen", False):
-        log("Modo empacotado (.exe): dependencias Python ja embutidas.")
+        log("Modo empacotado (.exe): dependencias embutidas (sem download).")
         ffmpeg_path = ensure_ffmpeg(log)
         log("== Verificacao concluida ==")
         return {"pip_ok": True, "ffmpeg": ffmpeg_path}

@@ -11,87 +11,93 @@ de destino e baixa. Usa [yt-dlp](https://github.com/yt-dlp/yt-dlp) como motor e
 Colar link  ->  Analisar  ->  Escolher formato  ->  Escolher pasta  ->  Baixar
 ```
 
-- **Analise**: o yt-dlp le os metadados do video (sem baixar) e o app monta
+* **Analise**: o yt-dlp le os metadados do video (sem baixar) e o app monta
   opcoes amigaveis: "Melhor disponivel", "1080p", "720p", ..., "Somente audio (MP3)".
-- **Download**: o yt-dlp baixa as faixas e o FFmpeg junta audio+video (ou
+* **Download**: o yt-dlp baixa as faixas e o FFmpeg junta audio+video (ou
   converte para MP3), salvando na pasta escolhida.
 
-## Requisitos
+## Opcao 1 — Executavel autonomo (recomendado para distribuir)
 
-- **Windows** (o app baixa o FFmpeg automaticamente para Windows).
-- **Python 3.9+** instalado ([python.org](https://www.python.org/downloads/) —
-  marque "Add Python to PATH" no instalador).
+Gera um unico `.exe` que **nao precisa de Python**, **nao baixa FFmpeg** e
+**nao instala pacotes** na primeira execucao. So executar.
 
-As demais dependencias (PySide6, yt-dlp, FFmpeg) sao **verificadas e instaladas
-automaticamente** na primeira execucao. O FFmpeg vai para uma subpasta `bin/`
-do proprio app — nao precisa de permissao de administrador.
+No Windows, com Python 3.9+ instalado (so para o build):
 
-## Como usar (Windows)
+```bat
+build_exe.bat
+```
 
-1. Instale o Python 3.9+ (se ainda nao tiver).
-2. Baixe/coloque esta pasta em qualquer lugar.
-3. Duplo-clique em `main.py`, ou pelo terminal:
+O script:
+1. Instala as dependencias de build (PySide6, yt-dlp, certifi, pyinstaller).
+2. Baixa o FFmpeg **apenas nesta etapa de build** (se ainda nao estiver em `bin/`).
+3. Gera `dist\StreamDownloader.exe` com FFmpeg embutido.
 
-   ```bat
-   python main.py
-   ```
+Copie so o `.exe` para qualquer PC Windows e rode. Internet so e necessaria
+para baixar os videos (nao para dependencias).
 
-4. Na primeira vez, aguarde a instalacao automatica das dependencias.
-5. Cole o link, clique **Analisar**, escolha o formato, escolha a pasta e clique **Baixar**.
+### Build manual (equivalente)
+
+```bat
+pip install -r requirements.txt pyinstaller
+python -c "import deps; deps.ensure_ffmpeg()"
+pyinstaller StreamDownloader.spec
+```
+
+## Opcao 2 — Rodar com Python (desenvolvimento)
+
+1. Instale o Python 3.9+ ([python.org](https://www.python.org/downloads/) —
+   marque "Add Python to PATH").
+2. Coloque esta pasta em qualquer lugar.
+3. Rode:
+
+```bat
+python main.py
+```
+
+Na primeira vez o app instala PySide6, yt-dlp e baixa o FFmpeg para `bin/`
+(precisa de internet). Nas proximas, sobe direto.
 
 ## Estrutura
 
 ```
 streamDownloader/
-├── main.py          # ponto de entrada: verifica deps e sobe a interface
-├── deps.py          # verificacao e auto-instalacao (PySide6, yt-dlp, FFmpeg)
-├── downloader.py    # logica com yt-dlp (listar formatos, baixar)
-├── ui.py            # interface desktop PySide6
+├── main.py              # ponto de entrada
+├── deps.py              # deps + FFmpeg (nao baixa no modo .exe)
+├── downloader.py        # logica yt-dlp
+├── ui.py                # interface PySide6
+├── sslfix.py           # certificados HTTPS
 ├── requirements.txt
-└── bin/             # ffmpeg.exe (criado automaticamente na 1a execucao)
+├── StreamDownloader.spec
+├── build_exe.bat        # gera o .exe autonomo
+└── bin/                 # ffmpeg.exe (criado no build ou na 1a execucao .py)
 ```
-
-## Gerar um executavel portatil (opcional)
-
-Para distribuir como um unico `.exe` (sem exigir Python instalado):
-
-```bat
-pip install pyinstaller
-pyinstaller --onefile --windowed --name StreamDownloader main.py
-```
-
-O executavel sai em `dist/StreamDownloader.exe`. O FFmpeg continua sendo baixado
-para a pasta `bin/` ao lado do executavel na primeira execucao.
 
 ## Observacoes
 
-- **yt-dlp desatualizado**: sites mudam com frequencia. Se um download falhar,
-  rode `pip install --upgrade yt-dlp`. (O app tambem tenta manter atualizado.)
-- **Legalidade**: baixar videos pode violar os Termos de Servico dos sites e
+* **yt-dlp desatualizado**: sites mudam com frequencia. No modo Python:
+  `pip install --upgrade yt-dlp`. No .exe, reconstrua com yt-dlp atualizado.
+* **Legalidade**: baixar videos pode violar os Termos de Servico dos sites e
   envolver direitos autorais. Use para conteudo proprio, uso pessoal/educacional
   ou material com licenca que permita.
 
 ## Solucao de problemas
 
 | Problema | Causa provavel | Solucao |
-|---|---|---|
+| --- | --- | --- |
 | "python nao e reconhecido" | Python fora do PATH | Reinstale marcando "Add Python to PATH" |
-| Download de alta qualidade falha | FFmpeg ausente | Deixe o app baixar (precisa de internet) ou instale o FFmpeg |
-| Erro de extracao num site | yt-dlp desatualizado | `pip install --upgrade yt-dlp` |
-| `Cannot parse data` (Facebook/Instagram) | Video exige login OU bug temporario do extractor do yt-dlp | Use os cookies do navegador: `set SD_BROWSER=chrome` (ou edge/firefox) antes de abrir o app. Se persistir, atualize o yt-dlp; pode ser bug conhecido do site |
-| `CERTIFICATE_VERIFY_FAILED` / "unable to get local issuer certificate" | Python nao acha os certificados raiz (comum no Windows ou atras de antivirus/proxy corporativo) | O app ja usa o `certifi` automaticamente. Se persistir (proxy que reescreve TLS), rode como ultimo recurso com a verificacao desativada: defina a variavel `SD_NO_CHECK_CERT=1` antes de abrir o app (inseguro) |
+| Download de alta qualidade falha | FFmpeg ausente | No .exe: reconstrua com `build_exe.bat`. No .py: deixe o app baixar |
+| Erro de extracao num site | yt-dlp desatualizado | `pip install --upgrade yt-dlp` e reconstrua o exe se for o caso |
+| Cannot parse data (Facebook/Instagram) | Video exige login OU bug do extractor | `set SD_BROWSER=chrome` (ou edge/firefox) antes de abrir |
+| CERTIFICATE_VERIFY_FAILED | certificados / proxy | O app usa certifi. Ultimo recurso: `set SD_NO_CHECK_CERT=1` |
 
 ### Erro de certificado SSL (Windows)
 
-Se ao analisar um link aparecer `CERTIFICATE_VERIFY_FAILED`, o app agora
-resolve automaticamente usando o pacote `certifi` (certificados da Mozilla).
+Se ao analisar um link aparecer `CERTIFICATE_VERIFY_FAILED`, o app resolve
+automaticamente com o pacote `certifi`.
 
-Se o erro persistir — normalmente por um proxy/antivirus corporativo que
-intercepta o trafego HTTPS — o ideal e instalar a CA interna da empresa no
-Windows. Como ultimo recurso (e por sua conta e risco, pois desativa a
-validacao do certificado), rode com:
+Se persistir (proxy/antivirus corporativo), como ultimo recurso:
 
 ```bat
 set SD_NO_CHECK_CERT=1
-python main.py
+StreamDownloader.exe
 ```

@@ -2,23 +2,23 @@
 """
 StreamDownloader.spec — receita de build do PyInstaller.
 
-Gera um unico executavel (onefile) sem console (janela GUI).
+Gera um unico executavel (onefile) sem console (janela GUI), com FFmpeg
+embutido. O .exe NAO baixa nada na primeira execucao: so executa.
 
-Como usar:
-    pip install pyinstaller
-    pyinstaller StreamDownloader.spec
+Como usar (recomendado):
+    build_exe.bat
+
+Ou manualmente:
+    1. Coloque ffmpeg.exe e ffprobe.exe em ./bin/
+       (rode uma vez: python -c "import deps; deps.ensure_ffmpeg()")
+    2. pip install pyinstaller
+    3. pyinstaller StreamDownloader.spec
 
 O executavel sai em dist/StreamDownloader.exe.
-
-Observacoes:
-- Os modulos locais (main, deps, downloader, ui, sslfix) sao incluidos como
-  scripts do projeto automaticamente a partir de main.py.
-- Coletamos os dados do 'certifi' (bundle de CAs) para o SSL funcionar no exe.
-- O FFmpeg NAO e embutido: o app baixa para ./bin na 1a execucao (Windows).
-  Se preferir embutir, veja o comentario em 'binaries' abaixo.
 """
 
 from PyInstaller.utils.hooks import collect_all
+import os
 
 datas = []
 binaries = []
@@ -37,15 +37,29 @@ datas += d
 binaries += b
 hiddenimports += h
 
-# --- EMBUTIR o ffmpeg.exe/ffprobe.exe (se existirem em ./bin) ---
-# Assim o exe NAO baixa o FFmpeg na execucao: abre na hora e funciona offline.
-import os
+# --- EMBUTIR o ffmpeg.exe/ffprobe.exe (obrigatorio para exe sem download) ---
+_missing = []
 for _exe in ("ffmpeg.exe", "ffprobe.exe"):
     _p = os.path.join("bin", _exe)
     if os.path.isfile(_p):
         binaries.append((_p, "bin"))
+        print(f"[spec] OK: embutindo {_p}")
     else:
-        print(f"[spec] AVISO: {_p} nao encontrado; o exe baixara o FFmpeg na 1a execucao.")
+        _missing.append(_p)
+        print(f"[spec] ERRO: {_p} nao encontrado.")
+
+if _missing:
+    print()
+    print("[spec] ============================================================")
+    print("[spec] FFmpeg NAO encontrado em ./bin/")
+    print("[spec] O executavel NAO sera autonomo (vai tentar baixar na 1a vez).")
+    print("[spec] Para embutir:")
+    print("[spec]   1. Rode: python -c \"import deps; deps.ensure_ffmpeg()\"")
+    print("[spec]   2. Ou baixe o essentials de https://www.gyan.dev/ffmpeg/")
+    print("[spec]      e copie ffmpeg.exe + ffprobe.exe para a pasta bin/")
+    print("[spec]   3. Rode de novo: pyinstaller StreamDownloader.spec")
+    print("[spec] ============================================================")
+    print()
 
 block_cipher = None
 
